@@ -16,19 +16,8 @@ import urllib2
 # Start Configuration
 SLACK_TOKENS = ('<insert your Slack token>', '<additional Slack token>')
 IMAGE_LOCATION = '<insert your image path> (e.g. http://www.my-site.com/images/)'
-COMPOSITE_IMAGE = IMAGE_LOCATION + 'composite.png'
-VALID_VOTES = {
-    0 : IMAGE_LOCATION + '0.png',
-    1 : IMAGE_LOCATION + '1.png',
-    2 : IMAGE_LOCATION + '2.png',
-    3 : IMAGE_LOCATION + '3.png',
-    5 : IMAGE_LOCATION + '5.png',
-    8 : IMAGE_LOCATION + '8.png',
-    13 : IMAGE_LOCATION + '13.png',
-    20 : IMAGE_LOCATION + '20.png',
-    40 : IMAGE_LOCATION + '40.png',
-    100 : IMAGE_LOCATION + '100.png'
-}
+COMPOSITE_IMAGE = []
+VALID_VOTES = {}
 # End Configuration
 
 logger = logging.getLogger()
@@ -68,35 +57,110 @@ def lambda_handler(event, context):
     command_arguments = post_data['text'].split(' ')
     sub_command = command_arguments[0]
 
-    if sub_command == 'deal':
+    if sub_command == 'setup':
+
+        valid_sizes = {'fibonacci' : {
+                        0 : IMAGE_LOCATION + '0.png',
+                        1 : IMAGE_LOCATION + '1.png',
+                        2 : IMAGE_LOCATION + '2.png',
+                        3 : IMAGE_LOCATION + '3.png',
+                        5 : IMAGE_LOCATION + '5.png',
+                        8 : IMAGE_LOCATION + '8.png',
+                        13 : IMAGE_LOCATION + '13.png',
+                        20 : IMAGE_LOCATION + '20.png',
+                        40 : IMAGE_LOCATION + '40.png',
+                        100 : IMAGE_LOCATION + '100.png',
+                        '?' : IMAGE_LOCATION + 'unsure.png'
+                    }
+                        'simple_fibonacci' : {
+                        1 : IMAGE_LOCATION + '1.png',
+                        3 : IMAGE_LOCATION + '3.png',
+                        5 : IMAGE_LOCATION + '5.png',
+                        8 : IMAGE_LOCATION + '8.png',
+                        '?' : IMAGE_LOCATION + 'unsure.png'
+                    }
+                        't_shirt_size' : {
+                        's' : IMAGE_LOCATION + 'small.png',
+                        'm' : IMAGE_LOCATION + 'medium.png',
+                        'l' : IMAGE_LOCATION + 'large.png',
+                        'xl' : IMAGE_LOCATION + 'extralarge.png',
+                        '?' : IMAGE_LOCATION + 'unsure.png',
+                    }
+                    'man_hours' : {
+                        1 : IMAGE_LOCATION + 'one.png',
+                        2 : IMAGE_LOCATION + 'two.png',
+                        3 : IMAGE_LOCATION + 'three.png',
+                        4 : IMAGE_LOCATION + 'four.png',
+                        5 : IMAGE_LOCATION + 'five.png',
+                        6 : IMAGE_LOCATION + 'six.png',
+                        7 : IMAGE_LOCATION + 'seven.png',
+                        8 : IMAGE_LOCATION + 'eight.png',
+                        '2d' : IMAGE_LOCATION + 'twod.png',
+                        '3d' : IMAGE_LOCATION + 'threed.png',
+                        '4d' : IMAGE_LOCATION + 'fourd.png',
+                        '5d' : IMAGE_LOCATION + 'fived.png',
+                        '1.5w' : IMAGE_LOCATION + 'weekhalf.png',
+                        '2w' : IMAGE_LOCATION + 'twow.png',
+                        '?' : IMAGE_LOCATION + 'unsure.png',
+                    }
+                    
+                }
+
+        setup_sub_command = command_arguments[1]
+
+        f = fibonnaci
+        s = simple_fibonacci
+        t = t_shirt_size
+        m = man_hours
+
+        sizes = ['f', 's', 't', 'm']
+
+        if len(command_arguments) < 2:
+            return create_ephemeral("You must enter a size format </pokerbot setup [f, s, t, m].")
+
+        if setup_sub_command not in sizes:
+            return create_ephemeral("Your choices are f, s, t or m in format /pokerbot setup <choice>.")
+        else:
+            if setup_sub_command == f:
+                VALID_VOTES.update(valid_sizes[fibonnaci])
+                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'composite.png')
+            elif setup_sub_command == s:
+                VALID_VOTES.update(valid_sizes[simple_fibonnaci])
+                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
+            elif setup_sub_command == t:
+                VALID_VOTES.update(valid_sizes[t_shirt_size])
+                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
+            else setup_sub_command == m:
+                VALID_VOTES.update(valid_sizes[man_hours])
+                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'mcomposite.png')
+    # write this setup to DynamoDB Planning Poker Channel Setup Table
+
+    elif sub_command == 'deal':
+        # Start session ID write to DynamoDB - sessions table, increment last session ID by +1
         if post_data['team_id'] not in poker_data.keys():
             poker_data[post_data['team_id']] = {}
 
         poker_data[post_data['team_id']][post_data['channel_id']] = {}
 
         message = Message('*The poker planning game has started.*')
-        message.add_attachment('Vote by typing */pokerbot vote <number>*.', None, COMPOSITE_IMAGE)
+        message.add_attachment('Vote by typing */pokerbot vote <size>*.', None, COMPOSITE_IMAGE)
 
         return message.get_message()
-
+    # need elif sub_command == 'story' <enter story here>
+    # record stories and sizes in results table - relate via primar_key to sessions table
     elif sub_command == 'vote':
         if (post_data['team_id'] not in poker_data.keys() or
                 post_data['channel_id'] not in poker_data[post_data['team_id']].keys()):
             return create_ephemeral("The poker planning game hasn't started yet.")
 
         if len(command_arguments) < 2:
-            return create_ephemeral("Your vote was not counted. You didn't enter a number.")
+            return create_ephemeral("Your vote was not counted. You didn't enter a size.")
 
         vote_sub_command = command_arguments[1]
         vote = None
 
-        try:
-            vote = int(vote_sub_command)
-        except ValueError:
-            return create_ephemeral("Your vote was not counted. Please enter a number.")
-
         if vote not in VALID_VOTES:
-            return create_ephemeral("Your vote was not counted. Please enter a valid poker planning number.")
+            return create_ephemeral("Your vote was not counted. Please enter a valid poker planning size.")
 
         already_voted = poker_data[post_data['team_id']][post_data['channel_id']].has_key(post_data['user_id'])
 
@@ -106,12 +170,12 @@ def lambda_handler(event, context):
         }
 
         if already_voted:
-            return create_ephemeral("You changed your vote to *%d*." % (vote))
+            return create_ephemeral("You changed your vote to *%s*." % (vote))
         else:
             message = Message('%s voted' % (post_data['user_name']))
             send_delayed_message(post_data['response_url'], message)
 
-            return create_ephemeral("You voted *%d*." % (vote))
+            return create_ephemeral("You voted *%s*." % (vote))
 
     elif sub_command == 'tally':
         if (post_data['team_id'] not in poker_data.keys() or
@@ -159,6 +223,7 @@ def lambda_handler(event, context):
             message.add_attachment('Everyone selected the same number.', 'good', VALID_VOTES.get(vote_set.pop()))
 
             return message.get_message()
+            # write result to results table in DynamoDB
         else:
             message = Message('*No winner yet.* Discuss and continue voting.')
 
@@ -166,11 +231,15 @@ def lambda_handler(event, context):
                 message.add_attachment(", ".join(votes[vote]), 'warning', VALID_VOTES[vote], True)
 
             return message.get_message()
+    # elif sub_command == 'end' --- closes out the session, sending session end to session ID table
+    # end will also trigger a summary of session results to be delivered - maybe eventually
+    # have export from DynamoDB into JIRA where it will update the size estimates
     elif sub_command == 'help':
         return create_ephemeral('Pokerbot helps you play Agile/Scrum poker planning.\n\n' +
                               'Use the following commands:\n' +
+                              ' /pokerbot setup\n' +
                               ' /pokerbot deal\n' +
-                              ' /pokerbot vote ' + str(sorted(VALID_VOTES.keys())) + '\n' +
+                              ' /pokerbot vote\n' +
                               ' /pokerbot tally\n' +
                               ' /pokerbot reveal')
 
