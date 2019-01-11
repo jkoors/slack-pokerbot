@@ -12,6 +12,7 @@ import logging
 from urlparse import parse_qs
 import json
 import urllib2
+import datetime
 
 # Start Configuration
 SLACK_TOKENS = ('<insert your Slack token>', '<additional Slack token>')
@@ -30,7 +31,7 @@ def lambda_handler(event, context):
     configuration path. This function handles the main functions of the Pokerbot
     including starting the game, voting, calculating and ending the game.
     """
-
+    dynamodb = boto3.resource("dynamodb")
     req_body = event['body']
     params = parse_qs(req_body)
     token = params['token'][0]
@@ -71,21 +72,21 @@ def lambda_handler(event, context):
                         40 : IMAGE_LOCATION + '40.png',
                         100 : IMAGE_LOCATION + '100.png',
                         '?' : IMAGE_LOCATION + 'unsure.png'
-                    }
+                    },
                         'simple_fibonacci' : {
                         1 : IMAGE_LOCATION + '1.png',
                         3 : IMAGE_LOCATION + '3.png',
                         5 : IMAGE_LOCATION + '5.png',
                         8 : IMAGE_LOCATION + '8.png',
                         '?' : IMAGE_LOCATION + 'unsure.png'
-                    }
+                    },
                         't_shirt_size' : {
                         's' : IMAGE_LOCATION + 'small.png',
                         'm' : IMAGE_LOCATION + 'medium.png',
                         'l' : IMAGE_LOCATION + 'large.png',
                         'xl' : IMAGE_LOCATION + 'extralarge.png',
                         '?' : IMAGE_LOCATION + 'unsure.png',
-                    }
+                    },
                     'man_hours' : {
                         1 : IMAGE_LOCATION + 'one.png',
                         2 : IMAGE_LOCATION + 'two.png',
@@ -108,35 +109,66 @@ def lambda_handler(event, context):
 
         setup_sub_command = command_arguments[1]
 
-        f = fibonnaci
-        s = simple_fibonacci
-        t = t_shirt_size
-        m = man_hours
+        f = valid_sizes['fibonnaci']
+        s = valid_sizes['simple_fibonacci']
+        t = valid_sizes['t_shirt_size']
+        m = valid_sizes['man_hours']
 
-        sizes = ['f', 's', 't', 'm']
+        sizes = [f, s, t, m]
 
         if len(command_arguments) < 2:
             return create_ephemeral("You must enter a size format </pokerbot setup [f, s, t, m].")
 
+        #may need for loop
         if setup_sub_command not in sizes:
             return create_ephemeral("Your choices are f, s, t or m in format /pokerbot setup <choice>.")
         else:
             if setup_sub_command == f:
-                VALID_VOTES.update(valid_sizes[fibonnaci])
+                VALID_VOTES.update(f)
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'composite.png')
             elif setup_sub_command == s:
-                VALID_VOTES.update(valid_sizes[simple_fibonnaci])
+                VALID_VOTES.update(valid_sizes['simple_fibonnaci'])
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
             elif setup_sub_command == t:
-                VALID_VOTES.update(valid_sizes[t_shirt_size])
+                VALID_VOTES.update(valid_sizes['t_shirt_size'])
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
-            else setup_sub_command == m:
-                VALID_VOTES.update(valid_sizes[man_hours])
+            elif setup_sub_command == m:
+                VALID_VOTES.update(valid_sizes['man_hours'])
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'mcomposite.png')
-    # write this setup to DynamoDB Planning Poker Channel Setup Table
+    
+        table = dynamodb.Table("pokerbot_config")
+        
+        response = table.update_item(
+            Key={
+                'channel': post_data["channel_name"],
+            },
+            UpdateExpression="set size = :s",
+            ExpressionAttributeValues={
+                ':s': setup_sub_command,
+            },
+            ReturnValues="UPDATED_NEW"
+        )
+
+    elif sub_command == 'start':
+        
+        return create_ephemeral("Your session is now being recorded, you can run deal command.")
+
+        table = dynamodb.Table("pokerbot_sessions")
+        
+        response = table.update_item(
+            Key={
+                'channel': post_data["channel_name"],
+                'date': datetime.date.today(),
+            },
+            UpdateExpression="set start_time = :s",
+            ExpressionAttributeValues={
+                ':s': datetime.datetime.now(),
+            },
+            ReturnValues="UPDATED_NEW"
+        )
+
 
     elif sub_command == 'deal':
-        # Start session ID write to DynamoDB - sessions table, increment last session ID by +1
         if post_data['team_id'] not in poker_data.keys():
             poker_data[post_data['team_id']] = {}
 
@@ -146,8 +178,8 @@ def lambda_handler(event, context):
         message.add_attachment('Vote by typing */pokerbot vote <size>*.', None, COMPOSITE_IMAGE)
 
         return message.get_message()
-    # need elif sub_command == 'story' <enter story here>
-    # record stories and sizes in results table - relate via primar_key to sessions table
+
+
     elif sub_command == 'vote':
         if (post_data['team_id'] not in poker_data.keys() or
                 post_data['channel_id'] not in poker_data[post_data['team_id']].keys()):
@@ -221,6 +253,9 @@ def lambda_handler(event, context):
         if len(vote_set) == 1:
             message = Message('*Congratulations!*')
             message.add_attachment('Everyone selected the same number.', 'good', VALID_VOTES.get(vote_set.pop()))
+            #read out first - get session id and current date
+            read.pokerbot_sessions
+            #pull out data object, add new attribute based on story ID & write new data object back to DB using same session ID
 
             return message.get_message()
             # write result to results table in DynamoDB
@@ -231,16 +266,23 @@ def lambda_handler(event, context):
                 message.add_attachment(", ".join(votes[vote]), 'warning', VALID_VOTES[vote], True)
 
             return message.get_message()
-    # elif sub_command == 'end' --- closes out the session, sending session end to session ID table
-    # end will also trigger a summary of session results to be delivered - maybe eventually
-    # have export from DynamoDB into JIRA where it will update the size estimates
+        
+
+    elif sub_command == 'end':
+        
+        #This will produce summary response of the session
+
+        
+
     elif sub_command == 'help':
         return create_ephemeral('Pokerbot helps you play Agile/Scrum poker planning.\n\n' +
                               'Use the following commands:\n' +
                               ' /pokerbot setup\n' +
+                              ' /pokerbot start\n' +
                               ' /pokerbot deal\n' +
                               ' /pokerbot vote\n' +
                               ' /pokerbot tally\n' +
+                              ' /pokerbot end\n'
                               ' /pokerbot reveal')
 
     else:
