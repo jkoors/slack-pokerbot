@@ -1,0 +1,33 @@
+Pseudo-Code:
+
+Initial Setup of bot:
+1. A team Planning Poker Channel is setup, or can run in the actual team channel
+2. Pokerbot associated and initial setup done within the channel
+3. Configuration written to the database with channel ID and size type chosen
+
+Using the bot:
+1. Start session /pokerbot start - launches new session, write Channel Name and Time/Date Now to DB 
+2. Facilitator gives a deal command, starting the first rounds of estimates "Planning Poker Game Has Started"
+    All commands now get checked to see if this above deal command was initiated
+    Deal command has to be given for each story until estimate is determined
+    Story entered by facilitator PRODENG-11111 KMS Key Rotation
+3. Team uses vote command followed by a valid size to estimate said story
+    runs checks to ensure valid votes - will prompt error message
+    Until reveal, user can change vote by running command again will say "changed vote to _x_"
+4. Facilitator can check on who voted running tally command
+    Will see if no one has voted, 1 person, some or All
+    Facilitator encourage those who haven't voted, to vote
+5. Facilitator uses reveal command when all votes are in
+    Displays all players estimates via card/attachement
+    check, if all votes are same - vote is accepted - record this story w/ vote, write to DB, restart for next story
+    different estimates - estimates not the same message, discuss and vote again.
+        Players can simply run new vote command until all the same
+        **Can we put an override where Facilitator can merely set the vote
+6. Facilitator Ends session via End command
+    This kicks off a summary of the session displayed as a message in the channel
+    May need to ensure deal command no longer active, meaning if next session starts deal in channel 
+      doesn't pickup last sessions deal command
+
+Future - Export next planned sprint API into DynamoDB, Session kicks off and iterates through stories in that session, 
+updating the story points attribute, end session and kicks off API PUT into JIRA updating the estimate fields like a 
+bulk change operation would do

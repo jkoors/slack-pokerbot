@@ -19,6 +19,7 @@ SLACK_TOKENS = ('<insert your Slack token>', '<additional Slack token>')
 IMAGE_LOCATION = '<insert your image path> (e.g. http://www.my-site.com/images/)'
 COMPOSITE_IMAGE = []
 VALID_VOTES = {}
+SESSION_ESTIMATES = {}
 # End Configuration
 
 logger = logging.getLogger()
@@ -118,8 +119,7 @@ def lambda_handler(event, context):
 
         if len(command_arguments) < 2:
             return create_ephemeral("You must enter a size format </pokerbot setup [f, s, t, m].")
-
-        #may need for loop
+        
         if setup_sub_command not in sizes:
             return create_ephemeral("Your choices are f, s, t or m in format /pokerbot setup <choice>.")
         else:
@@ -151,8 +151,6 @@ def lambda_handler(event, context):
 
     elif sub_command == 'start':
         
-        return create_ephemeral("Your session is now being recorded, you can run deal command.")
-
         table = dynamodb.Table("pokerbot_sessions")
         
         response = table.update_item(
@@ -167,14 +165,23 @@ def lambda_handler(event, context):
             ReturnValues="UPDATED_NEW"
         )
 
+        return create_ephemeral("Your session is now being recorded, you can run deal command.")
 
-    elif sub_command == 'deal':
+
+    elif sub_command == 'deal': /pokerbot deal PRODENG-11521
         if post_data['team_id'] not in poker_data.keys():
             poker_data[post_data['team_id']] = {}
+        
+        if len(command_arguments) < 2:
+            return create_ephemeral("You did not enter a JIRA ticket number.")
+
+        ticket_number = command_arguments[1]
 
         poker_data[post_data['team_id']][post_data['channel_id']] = {}
 
-        message = Message('*The poker planning game has started.*')
+        poker_data[post_data['team_id']][post_data['channel_id']]['ticket'] = ticket_number
+
+        message = Message('*The planning poker game has started* for {}.'.format(ticket_number))
         message.add_attachment('Vote by typing */pokerbot vote <size>*.', None, COMPOSITE_IMAGE)
 
         return message.get_message()
@@ -236,6 +243,9 @@ def lambda_handler(event, context):
 
         votes = {}
 
+        ticket_number = poker_data[post_data['team_id']][post_data['channel_id']]['ticket']
+        del poker_data[post_data['team_id']][post_data['channel_id']]['ticket']
+
         for player in poker_data[post_data['team_id']][post_data['channel_id']]:
             player_vote = poker_data[post_data['team_id']][post_data['channel_id']][player]['vote']
             player_name = poker_data[post_data['team_id']][post_data['channel_id']][player]['name']
@@ -244,21 +254,32 @@ def lambda_handler(event, context):
                 votes[player_vote] = []
 
             votes[player_vote].append(player_name)
-
-        # reset the game by deleting the current channel's data
+        
         del poker_data[post_data['team_id']][post_data['channel_id']]
 
         vote_set = set(votes.keys())
 
-        if len(vote_set) == 1:
+        if len(vote_set) == 1 : 
+            estimate = VALID_VOTES.get(vote_set.pop()
             message = Message('*Congratulations!*')
-            message.add_attachment('Everyone selected the same number.', 'good', VALID_VOTES.get(vote_set.pop()))
-            #read out first - get session id and current date
-            read.pokerbot_sessions
-            #pull out data object, add new attribute based on story ID & write new data object back to DB using same session ID
+            message.add_attachment('Everyone selected the same number.', 'good', estimate))
+            
+            table = dynamodb.Table("pokerbot_sessions")
+        
+            response = table.update_item(
+                Key={
+                    'channel': post_data["channel_name"],
+                    'date': datetime.date.today(),
+                },
+                UpdateExpression="set {} = :e".format(ticket_number),
+                ExpressionAttributeValues={
+                    ':e': estimate,
+                },
+                ReturnValues="UPDATED_NEW"
+            )
 
             return message.get_message()
-            # write result to results table in DynamoDB
+            
         else:
             message = Message('*No winner yet.* Discuss and continue voting.')
 
@@ -270,10 +291,27 @@ def lambda_handler(event, context):
 
     elif sub_command == 'end':
         
-        #This will produce summary response of the session
-
+        table = dynamodb.Table("pokerbot_sessions")
         
+        response = table.update_item(
+            Key={
+                'channel': post_data["channel_name"],
+                'date': datetime.date.today(),
+            },
+            UpdateExpression="set end_time = :s",
+            ExpressionAttributeValues={
+                ':s': datetime.datetime.now(),
+            },
+            ReturnValues="UPDATED_NEW"
+        )
+        
+        message = Message('*Session has ended, see results below:*')
 
+        for item in response.Items:
+            message.add_attachment('{key}:{value}'.format(key=item, value=response.Items[item]), 'good')
+
+        return message.get_message()
+        
     elif sub_command == 'help':
         return create_ephemeral('Pokerbot helps you play Agile/Scrum poker planning.\n\n' +
                               'Use the following commands:\n' +
@@ -282,8 +320,8 @@ def lambda_handler(event, context):
                               ' /pokerbot deal\n' +
                               ' /pokerbot vote\n' +
                               ' /pokerbot tally\n' +
-                              ' /pokerbot end\n'
-                              ' /pokerbot reveal')
+                              ' /pokerbot reveal\n' +
+                              ' /pokerbot end')
 
     else:
         return create_ephemeral('Invalid command. Type */pokerbot help* for pokerbot commands.')
