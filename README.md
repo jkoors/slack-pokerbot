@@ -4,6 +4,16 @@ Pokerbot is a [Slash Command](https://api.slack.com/slash-commands) for [Slack](
 
 ![Screenshot of Pokerbot in Slack](https://raw.githubusercontent.com/nateyolles/slack-pokerbot/master/images/screenshot.png)
 
+## Deployment to AWS
+
+To Build:
+`sam build --use-container`
+
+To Deploy:
+`sam deploy --profile CUSTOM_PROFILE --parameter-overrides SlackToken=YOUR_SLACK_TOKEN ImageLocation=YOUR_IMAGE_LOCATION`
+
+Note: The `--profile` parameter optional
+
 ## Configure Slack Slash Command
 
 1. Navigate to https://<your-team-name>.slack.com/apps/manage/custom-integrations
