@@ -403,7 +403,10 @@ class Message():
 
         :returns: the Slack message in format ready to return to Slack client
         """
+        body = json.dumps(self.__message)
+        logger.info("returning: %s", body)
+        
         return {
           "statusCode": 200,
-          "body": json.dumps(self.__message),
+          "body": body,
         }
