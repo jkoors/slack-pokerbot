@@ -14,7 +14,7 @@ Resources:
   PokerBotConfigTable:
     Type: AWS::DynamoDB::Table
     Properties: 
-      Name: pokerbot_config
+      TableName: pokerbot_config
       AttributeDefinitions: 
         - AttributeName: channel
           AttributeType: S
@@ -27,7 +27,7 @@ Resources:
   PokerBotSessionsTable:
     Type: AWS::DynamoDB::Table
     Properties: 
-      Name: pokerbot_sessions
+      TableName: pokerbot_sessions
       AttributeDefinitions: 
         - AttributeName: channel
           AttributeType: S
@@ -47,6 +47,12 @@ Resources:
       CodeUri: app/
       Handler: app.lambda_handler
       Runtime: python2.7
+      Events:
+        SlackEvent:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /
+            Method: POST
     Environment:
         Variables:
           SLACK_TOKEN: PUT YOUR TOKEN HERE
