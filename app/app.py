@@ -13,10 +13,11 @@ from urlparse import parse_qs
 import json
 import urllib2
 import datetime
+import os
 
 # Start Configuration
-SLACK_TOKENS = ('<insert your Slack token>', '<additional Slack token>')
-IMAGE_LOCATION = '<insert your image path> (e.g. http://www.my-site.com/images/)'
+SLACK_TOKENS = (os.getenv('SLACK_TOKEN'))
+IMAGE_LOCATION = os.getenv('IMAGE_LOCATION')
 COMPOSITE_IMAGE = []
 VALID_VOTES = {}
 SESSION_ESTIMATES = {}

@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "slack-pokerbot"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-vcr7bwfwtx9z"
+s3_prefix = "slack-pokerbot"
+region = "us-east-1"
+profile = "Innovation_Team_Admin"
+capabilities = "CAPABILITY_IAM"
