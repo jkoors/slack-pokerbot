@@ -65,9 +65,9 @@ Resources:
           IMAGE_LOCATION: !Ref ImageLocation
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: pokerbot_config
+            TableName: !Ref PokerBotConfigTable
         - DynamoDBCrudPolicy:
-            TableName: pokerbot_sessions
+            TableName: !Ref PokerBotSessionsTable
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
