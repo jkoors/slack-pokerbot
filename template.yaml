@@ -11,7 +11,7 @@ Globals:
     Timeout: 3
 
 Resources:
-  SlackPockerBotFunction:
+  SlackPokerBotFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: app/
@@ -22,12 +22,12 @@ Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  SlackPockerBotApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+  SlackPokerBotApi:
+    Description: "API Gateway endpoint URL for Prod stage for Slack Poker Bot"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
-  SlackPockerBotFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt SlackPockerBotFunction.Arn
-  SlackPockerBotFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt SlackPockerBotFunctionRole.Arn
+  SlackPokerBotFunction:
+    Description: "Slack Poker Bot Lambda Function ARN"
+    Value: !GetAtt SlackPokerBotFunction.Arn
+  SlackPokerBotFunctionIamRole:
+    Description: "Implicit IAM Role created for Slack Poker Bot function"
+    Value: !GetAtt SlackPokerBotFunctionRole.Arn
