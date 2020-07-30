@@ -7,10 +7,14 @@ Pokerbot is a [Slash Command](https://api.slack.com/slash-commands) for [Slack](
 ## Deployment to AWS
 
 To Build:
-`sam build --use-container`
+```
+sam build --use-container
+```
 
 To Deploy:
-`sam deploy --profile CUSTOM_PROFILE --parameter-overrides SlackToken=YOUR_SLACK_TOKEN ImageLocation=YOUR_IMAGE_LOCATION`
+```
+sam deploy --profile CUSTOM_PROFILE --parameter-overrides SlackToken=YOUR_SLACK_TOKEN ImageLocation=YOUR_IMAGE_LOCATION
+```
 
 Note: The `--profile` parameter optional
 
