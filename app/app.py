@@ -168,7 +168,7 @@ def lambda_handler(event, context):
         return create_ephemeral("Your session is now being recorded, you can run deal command.")
 
 
-    elif sub_command == 'deal': /pokerbot deal PRODENG-11521
+    elif sub_command == 'deal': #pokerbot deal PRODENG-11521
         if post_data['team_id'] not in poker_data.keys():
             poker_data[post_data['team_id']] = {}
         
@@ -260,9 +260,9 @@ def lambda_handler(event, context):
         vote_set = set(votes.keys())
 
         if len(vote_set) == 1 : 
-            estimate = VALID_VOTES.get(vote_set.pop()
+            estimate = VALID_VOTES.get(vote_set.pop())
             message = Message('*Congratulations!*')
-            message.add_attachment('Everyone selected the same number.', 'good', estimate))
+            message.add_attachment('Everyone selected the same number.', 'good', estimate)
             
             table = dynamodb.Table("pokerbot_sessions")
         
