@@ -63,6 +63,11 @@ Resources:
         Variables:
           SLACK_TOKEN: !Ref SlackToken
           IMAGE_LOCATION: !Ref ImageLocation
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: pokerbot_config
+        - DynamoDBCrudPolicy:
+            TableName: pokerbot_sessions
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

@@ -16,7 +16,7 @@ import datetime
 import os
 
 # Start Configuration
-SLACK_TOKENS = (os.getenv('SLACK_TOKEN'))
+SLACK_TOKENS = os.getenv('SLACK_TOKEN')
 IMAGE_LOCATION = os.getenv('IMAGE_LOCATION')
 COMPOSITE_IMAGE = []
 VALID_VOTES = {}
@@ -34,6 +34,7 @@ def lambda_handler(event, context):
     including starting the game, voting, calculating and ending the game.
     """
     dynamodb = boto3.resource("dynamodb")
+    
     req_body = event['body']
     params = parse_qs(req_body)
     token = params['token'][0]
@@ -54,91 +55,93 @@ def lambda_handler(event, context):
         'response_url' : params['response_url'][0]
     }
 
+    logger.info("post_data: %s", post_data)
+
     if post_data['text'] == None:
-        return create_ephemeral('Type */pokerbot help* for pokerbot commands.')
+        return create_ephemeral('Type */poker help* for pokerbot commands.')
 
     command_arguments = post_data['text'].split(' ')
     sub_command = command_arguments[0]
-
+    logger.info("sub_command: %s", sub_command)
     if sub_command == 'setup':
 
-        valid_sizes = {'fibonacci' : {
-                        0 : IMAGE_LOCATION + '0.png',
-                        1 : IMAGE_LOCATION + '1.png',
-                        2 : IMAGE_LOCATION + '2.png',
-                        3 : IMAGE_LOCATION + '3.png',
-                        5 : IMAGE_LOCATION + '5.png',
-                        8 : IMAGE_LOCATION + '8.png',
-                        13 : IMAGE_LOCATION + '13.png',
-                        20 : IMAGE_LOCATION + '20.png',
-                        40 : IMAGE_LOCATION + '40.png',
-                        100 : IMAGE_LOCATION + '100.png',
-                        '?' : IMAGE_LOCATION + 'unsure.png'
-                    },
-                        'simple_fibonacci' : {
-                        1 : IMAGE_LOCATION + '1.png',
-                        3 : IMAGE_LOCATION + '3.png',
-                        5 : IMAGE_LOCATION + '5.png',
-                        8 : IMAGE_LOCATION + '8.png',
-                        '?' : IMAGE_LOCATION + 'unsure.png'
-                    },
-                        't_shirt_size' : {
-                        's' : IMAGE_LOCATION + 'small.png',
-                        'm' : IMAGE_LOCATION + 'medium.png',
-                        'l' : IMAGE_LOCATION + 'large.png',
-                        'xl' : IMAGE_LOCATION + 'extralarge.png',
-                        '?' : IMAGE_LOCATION + 'unsure.png',
-                    },
-                    'man_hours' : {
-                        1 : IMAGE_LOCATION + 'one.png',
-                        2 : IMAGE_LOCATION + 'two.png',
-                        3 : IMAGE_LOCATION + 'three.png',
-                        4 : IMAGE_LOCATION + 'four.png',
-                        5 : IMAGE_LOCATION + 'five.png',
-                        6 : IMAGE_LOCATION + 'six.png',
-                        7 : IMAGE_LOCATION + 'seven.png',
-                        8 : IMAGE_LOCATION + 'eight.png',
-                        '2d' : IMAGE_LOCATION + 'twod.png',
-                        '3d' : IMAGE_LOCATION + 'threed.png',
-                        '4d' : IMAGE_LOCATION + 'fourd.png',
-                        '5d' : IMAGE_LOCATION + 'fived.png',
-                        '1.5w' : IMAGE_LOCATION + 'weekhalf.png',
-                        '2w' : IMAGE_LOCATION + 'twow.png',
-                        '?' : IMAGE_LOCATION + 'unsure.png',
-                    }
-                    
-                }
+        valid_sizes = {
+          'fibonacci' : {
+            0 : IMAGE_LOCATION + '0.png',
+            1 : IMAGE_LOCATION + '1.png',
+            2 : IMAGE_LOCATION + '2.png',
+            3 : IMAGE_LOCATION + '3.png',
+            5 : IMAGE_LOCATION + '5.png',
+            8 : IMAGE_LOCATION + '8.png',
+            13 : IMAGE_LOCATION + '13.png',
+            20 : IMAGE_LOCATION + '20.png',
+            40 : IMAGE_LOCATION + '40.png',
+            100 : IMAGE_LOCATION + '100.png',
+            '?' : IMAGE_LOCATION + 'unsure.png'
+          },
+          'simple_fibonacci' : {
+            1 : IMAGE_LOCATION + '1.png',
+            3 : IMAGE_LOCATION + '3.png',
+            5 : IMAGE_LOCATION + '5.png',
+            8 : IMAGE_LOCATION + '8.png',
+            '?' : IMAGE_LOCATION + 'unsure.png'
+          },
+          't_shirt_size' : {
+            's' : IMAGE_LOCATION + 'small.png',
+            'm' : IMAGE_LOCATION + 'medium.png',
+            'l' : IMAGE_LOCATION + 'large.png',
+            'xl' : IMAGE_LOCATION + 'extralarge.png',
+            '?' : IMAGE_LOCATION + 'unsure.png',
+          },
+          'man_hours' : {
+            1 : IMAGE_LOCATION + 'one.png',
+            2 : IMAGE_LOCATION + 'two.png',
+            3 : IMAGE_LOCATION + 'three.png',
+            4 : IMAGE_LOCATION + 'four.png',
+            5 : IMAGE_LOCATION + 'five.png',
+            6 : IMAGE_LOCATION + 'six.png',
+            7 : IMAGE_LOCATION + 'seven.png',
+            8 : IMAGE_LOCATION + 'eight.png',
+            '2d' : IMAGE_LOCATION + 'twod.png',
+            '3d' : IMAGE_LOCATION + 'threed.png',
+            '4d' : IMAGE_LOCATION + 'fourd.png',
+            '5d' : IMAGE_LOCATION + 'fived.png',
+            '1.5w' : IMAGE_LOCATION + 'weekhalf.png',
+            '2w' : IMAGE_LOCATION + 'twow.png',
+            '?' : IMAGE_LOCATION + 'unsure.png',
+          }
+        }
 
         setup_sub_command = command_arguments[1]
 
-        f = valid_sizes['fibonnaci']
+        f = valid_sizes['fibonacci']
         s = valid_sizes['simple_fibonacci']
         t = valid_sizes['t_shirt_size']
         m = valid_sizes['man_hours']
 
-        sizes = [f, s, t, m]
+        sizes = ['f', 's', 't', 'm']
 
         if len(command_arguments) < 2:
-            return create_ephemeral("You must enter a size format </pokerbot setup [f, s, t, m].")
+            return create_ephemeral("You must enter a size format </poker setup [f, s, t, m].")
         
         if setup_sub_command not in sizes:
-            return create_ephemeral("Your choices are f, s, t or m in format /pokerbot setup <choice>.")
+            return create_ephemeral("Your choices are f, s, t or m in format /poker setup <choice>.")
         else:
-            if setup_sub_command == f:
+            if setup_sub_command == 'f':
                 VALID_VOTES.update(f)
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'composite.png')
-            elif setup_sub_command == s:
-                VALID_VOTES.update(valid_sizes['simple_fibonnaci'])
+            elif setup_sub_command == 's':
+                VALID_VOTES.update(valid_sizes['simple_fibonacci'])
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
-            elif setup_sub_command == t:
+            elif setup_sub_command == 't':
                 VALID_VOTES.update(valid_sizes['t_shirt_size'])
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
-            elif setup_sub_command == m:
+            elif setup_sub_command == 'm':
                 VALID_VOTES.update(valid_sizes['man_hours'])
                 COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'mcomposite.png')
     
         table = dynamodb.Table("pokerbot_config")
-        
+        logger.info('Updating pokerbot_config...')
         response = table.update_item(
             Key={
                 'channel': post_data["channel_name"],
@@ -149,6 +152,7 @@ def lambda_handler(event, context):
             },
             ReturnValues="UPDATED_NEW"
         )
+        return create_ephemeral("Size has been set for channel.")
 
     elif sub_command == 'start':
         
@@ -157,11 +161,11 @@ def lambda_handler(event, context):
         response = table.update_item(
             Key={
                 'channel': post_data["channel_name"],
-                'date': datetime.date.today(),
+                'date': datetime.date.today().isoformat(),
             },
             UpdateExpression="set start_time = :s",
             ExpressionAttributeValues={
-                ':s': datetime.datetime.now(),
+                ':s': datetime.datetime.now().isoformat(),
             },
             ReturnValues="UPDATED_NEW"
         )
@@ -183,7 +187,7 @@ def lambda_handler(event, context):
         poker_data[post_data['team_id']][post_data['channel_id']]['ticket'] = ticket_number
 
         message = Message('*The planning poker game has started* for {}.'.format(ticket_number))
-        message.add_attachment('Vote by typing */pokerbot vote <size>*.', None, COMPOSITE_IMAGE)
+        message.add_attachment('Vote by typing */poker vote <size>*.', None, COMPOSITE_IMAGE)
 
         return message.get_message()
 
@@ -270,7 +274,7 @@ def lambda_handler(event, context):
             response = table.update_item(
                 Key={
                     'channel': post_data["channel_name"],
-                    'date': datetime.date.today(),
+                    'date': datetime.date.today().isoformat(),
                 },
                 UpdateExpression="set {} = :e".format(ticket_number),
                 ExpressionAttributeValues={
@@ -297,11 +301,11 @@ def lambda_handler(event, context):
         response = table.update_item(
             Key={
                 'channel': post_data["channel_name"],
-                'date': datetime.date.today(),
+                'date': datetime.date.today().isoformat(),
             },
             UpdateExpression="set end_time = :s",
             ExpressionAttributeValues={
-                ':s': datetime.datetime.now(),
+                ':s': datetime.datetime.now().isoformat(),
             },
             ReturnValues="UPDATED_NEW"
         )
@@ -316,26 +320,29 @@ def lambda_handler(event, context):
     elif sub_command == 'help':
         return create_ephemeral('Pokerbot helps you play Agile/Scrum poker planning.\n\n' +
                               'Use the following commands:\n' +
-                              ' /pokerbot setup\n' +
-                              ' /pokerbot start\n' +
-                              ' /pokerbot deal\n' +
-                              ' /pokerbot vote\n' +
-                              ' /pokerbot tally\n' +
-                              ' /pokerbot reveal\n' +
-                              ' /pokerbot end')
+                              ' /poker setup\n' +
+                              ' /poker start\n' +
+                              ' /poker deal\n' +
+                              ' /poker vote\n' +
+                              ' /poker tally\n' +
+                              ' /poker reveal\n' +
+                              ' /poker end')
 
     else:
-        return create_ephemeral('Invalid command. Type */pokerbot help* for pokerbot commands.')
+        return create_ephemeral('Invalid command. Type */poker help* for pokerbot commands.')
 
 def create_ephemeral(text):
     """Send private response to user initiating action
 
     :param text: text in the message
     """
-    message = {}
-    message['text'] = text
-
-    return message
+    
+    return {
+      "statusCode": 200,
+        "body": json.dumps({
+          "text": text
+      }),
+    }
 
 def send_delayed_message(url, message):
     """Send a delayed in_channel message.
@@ -396,4 +403,7 @@ class Message():
 
         :returns: the Slack message in format ready to return to Slack client
         """
-        return self.__message
+        return {
+          "statusCode": 200,
+          "body": json.dumps(self.__message),
+        }
