@@ -8,20 +8,67 @@ Hosted on AWS Lambda.
 """
 
 import boto3
+from boto3.dynamodb.conditions import Key
 import logging
 from urlparse import parse_qs
 import json
-import urllib2
+import requests
 import datetime
 import os
+import time
 
 # Start Configuration
 SLACK_TOKENS = os.getenv('SLACK_TOKEN')
 IMAGE_LOCATION = os.getenv('IMAGE_LOCATION')
-COMPOSITE_IMAGE = []
-VALID_VOTES = {}
-SESSION_ESTIMATES = {}
+TABLE_NAME = os.getenv('TABLE_NAME')
 # End Configuration
+
+valid_sizes = {
+    'f' : {
+        '0' : IMAGE_LOCATION + '0.png',
+        '1' : IMAGE_LOCATION + '1.png',
+        '2' : IMAGE_LOCATION + '2.png',
+        '3' : IMAGE_LOCATION + '3.png',
+        '5' : IMAGE_LOCATION + '5.png',
+        '8' : IMAGE_LOCATION + '8.png',
+        '13' : IMAGE_LOCATION + '13.png',
+        '20' : IMAGE_LOCATION + '20.png',
+        '40' : IMAGE_LOCATION + '40.png',
+        '100' : IMAGE_LOCATION + '100.png',
+        '?' : IMAGE_LOCATION + 'unsure.png'
+    },
+    's' : {
+        '1' : IMAGE_LOCATION + '1.png',
+        '3' : IMAGE_LOCATION + '3.png',
+        '5' : IMAGE_LOCATION + '5.png',
+        '8' : IMAGE_LOCATION + '8.png',
+        '?' : IMAGE_LOCATION + 'unsure.png'
+    },
+    't' : {
+        's' : IMAGE_LOCATION + 'small.png',
+        'm' : IMAGE_LOCATION + 'medium.png',
+        'l' : IMAGE_LOCATION + 'large.png',
+        'xl' : IMAGE_LOCATION + 'extralarge.png',
+        '?' : IMAGE_LOCATION + 'unsure.png',
+    },
+    'm' : {
+        '1' : IMAGE_LOCATION + 'one.png',
+        '2' : IMAGE_LOCATION + 'two.png',
+        '3' : IMAGE_LOCATION + 'three.png',
+        '4' : IMAGE_LOCATION + 'four.png',
+        '5' : IMAGE_LOCATION + 'five.png',
+        '6' : IMAGE_LOCATION + 'six.png',
+        '7' : IMAGE_LOCATION + 'seven.png',
+        '8' : IMAGE_LOCATION + 'eight.png',
+        '2d' : IMAGE_LOCATION + 'twod.png',
+        '3d' : IMAGE_LOCATION + 'threed.png',
+        '4d' : IMAGE_LOCATION + 'fourd.png',
+        '5d' : IMAGE_LOCATION + 'fived.png',
+        '1.5w' : IMAGE_LOCATION + 'weekhalf.png',
+        '2w' : IMAGE_LOCATION + 'twow.png',
+        '?' : IMAGE_LOCATION + 'unsure.png',
+    }
+}
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -34,6 +81,7 @@ def lambda_handler(event, context):
     including starting the game, voting, calculating and ending the game.
     """
     dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(TABLE_NAME)
     
     req_body = event['body']
     params = parse_qs(req_body)
@@ -63,61 +111,12 @@ def lambda_handler(event, context):
     command_arguments = post_data['text'].split(' ')
     sub_command = command_arguments[0]
     logger.info("sub_command: %s", sub_command)
+
+    team_and_channel = "%s|%s" % (post_data["team_id"], post_data["channel_id"])
+
     if sub_command == 'setup':
 
-        valid_sizes = {
-          'fibonacci' : {
-            0 : IMAGE_LOCATION + '0.png',
-            1 : IMAGE_LOCATION + '1.png',
-            2 : IMAGE_LOCATION + '2.png',
-            3 : IMAGE_LOCATION + '3.png',
-            5 : IMAGE_LOCATION + '5.png',
-            8 : IMAGE_LOCATION + '8.png',
-            13 : IMAGE_LOCATION + '13.png',
-            20 : IMAGE_LOCATION + '20.png',
-            40 : IMAGE_LOCATION + '40.png',
-            100 : IMAGE_LOCATION + '100.png',
-            '?' : IMAGE_LOCATION + 'unsure.png'
-          },
-          'simple_fibonacci' : {
-            1 : IMAGE_LOCATION + '1.png',
-            3 : IMAGE_LOCATION + '3.png',
-            5 : IMAGE_LOCATION + '5.png',
-            8 : IMAGE_LOCATION + '8.png',
-            '?' : IMAGE_LOCATION + 'unsure.png'
-          },
-          't_shirt_size' : {
-            's' : IMAGE_LOCATION + 'small.png',
-            'm' : IMAGE_LOCATION + 'medium.png',
-            'l' : IMAGE_LOCATION + 'large.png',
-            'xl' : IMAGE_LOCATION + 'extralarge.png',
-            '?' : IMAGE_LOCATION + 'unsure.png',
-          },
-          'man_hours' : {
-            1 : IMAGE_LOCATION + 'one.png',
-            2 : IMAGE_LOCATION + 'two.png',
-            3 : IMAGE_LOCATION + 'three.png',
-            4 : IMAGE_LOCATION + 'four.png',
-            5 : IMAGE_LOCATION + 'five.png',
-            6 : IMAGE_LOCATION + 'six.png',
-            7 : IMAGE_LOCATION + 'seven.png',
-            8 : IMAGE_LOCATION + 'eight.png',
-            '2d' : IMAGE_LOCATION + 'twod.png',
-            '3d' : IMAGE_LOCATION + 'threed.png',
-            '4d' : IMAGE_LOCATION + 'fourd.png',
-            '5d' : IMAGE_LOCATION + 'fived.png',
-            '1.5w' : IMAGE_LOCATION + 'weekhalf.png',
-            '2w' : IMAGE_LOCATION + 'twow.png',
-            '?' : IMAGE_LOCATION + 'unsure.png',
-          }
-        }
-
         setup_sub_command = command_arguments[1]
-
-        f = valid_sizes['fibonacci']
-        s = valid_sizes['simple_fibonacci']
-        t = valid_sizes['t_shirt_size']
-        m = valid_sizes['man_hours']
 
         sizes = ['f', 's', 't', 'm']
 
@@ -126,92 +125,106 @@ def lambda_handler(event, context):
         
         if setup_sub_command not in sizes:
             return create_ephemeral("Your choices are f, s, t or m in format /poker setup <choice>.")
-        else:
-            if setup_sub_command == 'f':
-                VALID_VOTES.update(f)
-                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'composite.png')
-            elif setup_sub_command == 's':
-                VALID_VOTES.update(valid_sizes['simple_fibonacci'])
-                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
-            elif setup_sub_command == 't':
-                VALID_VOTES.update(valid_sizes['t_shirt_size'])
-                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'scomposite.png')
-            elif setup_sub_command == 'm':
-                VALID_VOTES.update(valid_sizes['man_hours'])
-                COMPOSITE_IMAGE.append(IMAGE_LOCATION + 'mcomposite.png')
     
-        table = dynamodb.Table("pokerbot_config")
-        logger.info('Updating pokerbot_config...')
-        response = table.update_item(
-            Key={
-                'channel': post_data["channel_name"],
-            },
-            UpdateExpression="set size = :s",
-            ExpressionAttributeValues={
-                ':s': setup_sub_command,
-            },
-            ReturnValues="UPDATED_NEW"
+        logger.info('Updating table with config...')
+        table.put_item(
+            Item={
+                'TeamAndChannel': team_and_channel,
+                'Key': 'Config',
+                'Attributes': {
+                    'Size': setup_sub_command
+                }
+            }
         )
         return create_ephemeral("Size has been set for channel.")
 
-    elif sub_command == 'start':
-        
-        table = dynamodb.Table("pokerbot_sessions")
-        
-        response = table.update_item(
-            Key={
-                'channel': post_data["channel_name"],
-                'date': datetime.date.today().isoformat(),
-            },
-            UpdateExpression="set start_time = :s",
-            ExpressionAttributeValues={
-                ':s': datetime.datetime.now().isoformat(),
-            },
-            ReturnValues="UPDATED_NEW"
-        )
-
-        return create_ephemeral("Your session is now being recorded, you can run deal command.")
-
-
-    elif sub_command == 'deal': #pokerbot deal PRODENG-11521
-        if post_data['team_id'] not in poker_data.keys():
-            poker_data[post_data['team_id']] = {}
-        
+    elif sub_command == 'deal':
         if len(command_arguments) < 2:
             return create_ephemeral("You did not enter a JIRA ticket number.")
 
         ticket_number = command_arguments[1]
 
-        poker_data[post_data['team_id']][post_data['channel_id']] = {}
+        size = table.get_item(
+            Key={
+                'TeamAndChannel': team_and_channel,
+                'Key': 'Config'
+            }
+        )["Item"]["Attributes"]["Size"]
 
-        poker_data[post_data['team_id']][post_data['channel_id']]['ticket'] = ticket_number
+        table.put_item(
+            Item={
+                'TeamAndChannel': team_and_channel,
+                'Key': 'Session|%d' % time.time(),
+                'Attributes': {
+                    'TicketNumber': ticket_number,
+                    'Votes': {}
+                }
+            }
+        )
 
-        message = Message('*The planning poker game has started* for {}.'.format(ticket_number))
+        COMPOSITE_IMAGE = None
+        if size == 'f':
+            COMPOSITE_IMAGE = IMAGE_LOCATION + 'composite.png'
+        if size == 's':
+            COMPOSITE_IMAGE = IMAGE_LOCATION + 'scomposite.png'
+        if size == 't':
+            COMPOSITE_IMAGE = IMAGE_LOCATION + 'scomposite.png'
+        if size == 'm':
+            COMPOSITE_IMAGE = IMAGE_LOCATION + 'mcomposite.png'
+
+        logger.info('Size: %s COMPOSITE_IMAGE: %s' % (size, COMPOSITE_IMAGE))
+        message = Message('*The planning poker game has started* for: %s' % ticket_number)
         message.add_attachment('Vote by typing */poker vote <size>*.', None, COMPOSITE_IMAGE)
 
         return message.get_message()
 
-
     elif sub_command == 'vote':
-        if (post_data['team_id'] not in poker_data.keys() or
-                post_data['channel_id'] not in poker_data[post_data['team_id']].keys()):
+        res = table.query(
+            KeyConditionExpression = Key('TeamAndChannel').eq(team_and_channel) & Key('Key').begins_with('Session|'),
+            ScanIndexForward = False,
+            Limit = 1
+        )
+        if len(res["Items"]) == 0:
             return create_ephemeral("The poker planning game hasn't started yet.")
+
+        session = res["Items"][0]
 
         if len(command_arguments) < 2:
             return create_ephemeral("Your vote was not counted. You didn't enter a size.")
+        
+        size = table.get_item(
+            Key={
+                'TeamAndChannel': team_and_channel,
+                'Key': 'Config'
+            }
+        )["Item"]["Attributes"]["Size"]
 
-        vote_sub_command = command_arguments[1]
-        vote = None
+        vote = command_arguments[1]
 
-        if vote not in VALID_VOTES:
+        logger.info('Size: %s Vote: %s' % (size, vote))
+
+        if vote not in valid_sizes[size]:
             return create_ephemeral("Your vote was not counted. Please enter a valid poker planning size.")
 
-        already_voted = poker_data[post_data['team_id']][post_data['channel_id']].has_key(post_data['user_id'])
+        logger.info('Adding vote %s for %s' % (vote, post_data["user_name"]))
 
-        poker_data[post_data['team_id']][post_data['channel_id']][post_data['user_id']] = {
-            'vote' : vote,
-            'name' : post_data['user_name']
-        }
+        table.update_item(
+            Key={
+                'TeamAndChannel': session['TeamAndChannel'],
+                'Key': session['Key']
+            },
+            UpdateExpression="set Attributes.Votes.#USERID = :vote",
+            ExpressionAttributeNames={
+                '#USERID': post_data["user_id"]
+            },
+            ExpressionAttributeValues={
+                ':vote': [ post_data["user_name"], vote ]
+            }
+        )
+
+        already_voted = post_data["user_id"] in session['Attributes']['Votes']
+
+        logger.info('Already voted: %s' % already_voted)
 
         if already_voted:
             return create_ephemeral("You changed your vote to *%s*." % (vote))
@@ -222,15 +235,21 @@ def lambda_handler(event, context):
             return create_ephemeral("You voted *%s*." % (vote))
 
     elif sub_command == 'tally':
-        if (post_data['team_id'] not in poker_data.keys() or
-                post_data['channel_id'] not in poker_data[post_data['team_id']].keys()):
+        res = table.query(
+            KeyConditionExpression = Key('TeamAndChannel').eq(team_and_channel) & Key('Key').begins_with('Session|'),
+            ScanIndexForward = False,
+            Limit = 1
+        )
+        if len(res["Items"]) == 0:
             return create_ephemeral("The poker planning game hasn't started yet.")
+
+        session = res["Items"][0]
 
         message = None
         names = []
 
-        for player in poker_data[post_data['team_id']][post_data['channel_id']]:
-            names.append(poker_data[post_data['team_id']][post_data['channel_id']][player]['name'])
+        for key, vote in session["Attributes"]["Votes"].iteritems():
+            names.append(vote[0])
 
         if len(names) == 0:
             message = Message('No one has voted yet.')
@@ -242,46 +261,42 @@ def lambda_handler(event, context):
         return message.get_message()
 
     elif sub_command == 'reveal':
-        if (post_data['team_id'] not in poker_data.keys() or
-                post_data['channel_id'] not in poker_data[post_data['team_id']].keys()):
+        res = table.query(
+            KeyConditionExpression = Key('TeamAndChannel').eq(team_and_channel) & Key('Key').begins_with('Session|'),
+            ScanIndexForward = False,
+            Limit = 1
+        )
+        if len(res["Items"]) == 0:
             return create_ephemeral("The poker planning game hasn't started yet.")
+        
+        session = res["Items"][0]
+
+        size = table.get_item(
+            Key={
+                'TeamAndChannel': team_and_channel,
+                'Key': 'Config'
+            }
+        )["Item"]["Attributes"]["Size"]
 
         votes = {}
 
-        ticket_number = poker_data[post_data['team_id']][post_data['channel_id']]['ticket']
-        del poker_data[post_data['team_id']][post_data['channel_id']]['ticket']
+        ticket_number = session["Attributes"]["TicketNumber"]
 
-        for player in poker_data[post_data['team_id']][post_data['channel_id']]:
-            player_vote = poker_data[post_data['team_id']][post_data['channel_id']][player]['vote']
-            player_name = poker_data[post_data['team_id']][post_data['channel_id']][player]['name']
+        for key, vote in session["Attributes"]["Votes"].iteritems():
+            player_name = vote[0]
+            player_vote = vote[1]
 
             if not votes.has_key(player_vote):
                 votes[player_vote] = []
 
             votes[player_vote].append(player_name)
-        
-        del poker_data[post_data['team_id']][post_data['channel_id']]
 
         vote_set = set(votes.keys())
 
         if len(vote_set) == 1 : 
-            estimate = VALID_VOTES.get(vote_set.pop())
+            estimate = valid_sizes[size].get(vote_set.pop())
             message = Message('*Congratulations!*')
             message.add_attachment('Everyone selected the same number.', 'good', estimate)
-            
-            table = dynamodb.Table("pokerbot_sessions")
-        
-            response = table.update_item(
-                Key={
-                    'channel': post_data["channel_name"],
-                    'date': datetime.date.today().isoformat(),
-                },
-                UpdateExpression="set {} = :e".format(ticket_number),
-                ExpressionAttributeValues={
-                    ':e': estimate,
-                },
-                ReturnValues="UPDATED_NEW"
-            )
 
             return message.get_message()
             
@@ -289,43 +304,17 @@ def lambda_handler(event, context):
             message = Message('*No winner yet.* Discuss and continue voting.')
 
             for vote in votes:
-                message.add_attachment(", ".join(votes[vote]), 'warning', VALID_VOTES[vote], True)
+                message.add_attachment(", ".join(votes[vote]), 'warning', valid_sizes[size][vote], True)
 
             return message.get_message()
-        
-
-    elif sub_command == 'end':
-        
-        table = dynamodb.Table("pokerbot_sessions")
-        
-        response = table.update_item(
-            Key={
-                'channel': post_data["channel_name"],
-                'date': datetime.date.today().isoformat(),
-            },
-            UpdateExpression="set end_time = :s",
-            ExpressionAttributeValues={
-                ':s': datetime.datetime.now().isoformat(),
-            },
-            ReturnValues="UPDATED_NEW"
-        )
-        
-        message = Message('*Session has ended, see results below:*')
-
-        for item in response.Items:
-            message.add_attachment('{key}:{value}'.format(key=item, value=response.Items[item]), 'good')
-
-        return message.get_message()
         
     elif sub_command == 'help':
         return create_ephemeral('Pokerbot helps you play Agile/Scrum poker planning.\n\n' +
                               'Use the following commands:\n' +
                               ' /poker setup\n' +
-                              ' /poker start\n' +
                               ' /poker deal\n' +
                               ' /poker vote\n' +
                               ' /poker tally\n' +
-                              ' /poker reveal\n' +
                               ' /poker end')
 
     else:
@@ -349,14 +338,8 @@ def send_delayed_message(url, message):
 
     You can send up to 5 messages per user command.
     """
-
-    req = urllib2.Request(url)
-    req.add_header('Content-Type', 'application/json')
-
-    try:
-        response = urllib2.urlopen(req, json.dumps(message.get_message()))
-    except urllib2.URLError:
-        logger.error("Could not send delayed message to %s", url)
+    r = requests.post(url, json = message.body())
+    logger.info('send_delayed_message status_code: %s' % r.status_code)
 
 class Message():
     """Public Slack message
@@ -373,6 +356,9 @@ class Message():
         self.__message = {}
         self.__message['response_type'] = 'in_channel'
         self.__message['text'] = text
+    
+    def body(self):
+        return self.__message;
 
     def add_attachment(self, text, color=None, image=None, thumbnail=False):
         """Add attachment to Slack message.

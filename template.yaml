@@ -15,34 +15,24 @@ Parameters:
     Type: String
   ImageLocation:
     Type: String
+  TableName:
+    Type: String
+    Default: pokerbot
 
 Resources:
-  PokerBotConfigTable:
+  TheTable:
     Type: AWS::DynamoDB::Table
     Properties: 
-      TableName: pokerbot_config
+      TableName: !Ref TableName
       AttributeDefinitions: 
-        - AttributeName: channel
+        - AttributeName: TeamAndChannel
+          AttributeType: S
+        - AttributeName: Key
           AttributeType: S
       KeySchema: 
-        - AttributeName: channel
+        - AttributeName: TeamAndChannel
           KeyType: HASH
-      ProvisionedThroughput: 
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
-  PokerBotSessionsTable:
-    Type: AWS::DynamoDB::Table
-    Properties: 
-      TableName: pokerbot_sessions
-      AttributeDefinitions: 
-        - AttributeName: channel
-          AttributeType: S
-        - AttributeName: date
-          AttributeType: S
-      KeySchema: 
-        - AttributeName: channel
-          KeyType: HASH
-        - AttributeName: date
+        - AttributeName: Key
           KeyType: RANGE
       ProvisionedThroughput: 
         ReadCapacityUnits: 5
@@ -63,11 +53,10 @@ Resources:
         Variables:
           SLACK_TOKEN: !Ref SlackToken
           IMAGE_LOCATION: !Ref ImageLocation
+          TABLE_NAME: !Ref TableName
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref PokerBotConfigTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref PokerBotSessionsTable
+            TableName: !Ref TheTable
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
